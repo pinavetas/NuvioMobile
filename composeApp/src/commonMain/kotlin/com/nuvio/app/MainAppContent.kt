@@ -1102,6 +1102,30 @@ internal fun MainAppContent(
                 )
             }
 
+        val onDownload: ContentDownloadAction =
+            { type, videoId, parentMetaId, parentMetaType, title, logo, poster, background, seasonNumber, episodeNumber, episodeTitle, episodeThumbnail ->
+                val streamLaunchId = StreamLaunchStore.put(
+                    StreamLaunch(
+                        profileId = activePlaybackProfileId,
+                        type = type,
+                        videoId = videoId,
+                        parentMetaId = parentMetaId,
+                        parentMetaType = parentMetaType,
+                        title = title,
+                        logo = logo,
+                        poster = poster,
+                        background = background,
+                        seasonNumber = seasonNumber,
+                        episodeNumber = episodeNumber,
+                        episodeTitle = episodeTitle,
+                        episodeThumbnail = episodeThumbnail,
+                        manualSelection = true,
+                        isDownloadPicker = true,
+                    ),
+                )
+                navController.navigate(StreamRoute(launchId = streamLaunchId, title = title))
+            }
+
         LaunchedEffect(Unit) {
             if (!ownsAppRuntime) return@LaunchedEffect
             PartyRepository.events.collect { event ->
@@ -1523,6 +1547,8 @@ internal fun MainAppContent(
                         navController = navController,
                         onPlay = onPlay,
                         onPlayManually = onPlayManually,
+                        onDownload = onDownload,
+                        onOpenDownloads = { navController.navigate(DownloadsRoute(downloadsTitle)) },
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = LocalNavAnimatedContentScope.current,
                     )

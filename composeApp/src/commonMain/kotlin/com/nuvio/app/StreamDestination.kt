@@ -414,11 +414,11 @@ internal fun StreamDestination(
         episode = launch.episodeNumber,
         manualSelection = launch.manualSelection,
     )
-    val showLoadingScreen = autoPlayNavigationStarted || resolvingDebridStream || resolvingYouTubeStream || preparingServerStream || streamsUiState.shouldShowAutoPlayLoading(
+    val showLoadingScreen = !launch.isDownloadPicker && (autoPlayNavigationStarted || resolvingDebridStream || resolvingYouTubeStream || preparingServerStream || streamsUiState.shouldShowAutoPlayLoading(
         expectedRequestToken = expectedStreamsRequestToken,
         settings = playerSettings,
         manualSelection = launch.manualSelection,
-    )
+    ))
     val useLandscapeLoading = autoPlayNavigationStarted || streamsUiState.shouldUseLandscapeAutoPlayLoading(
         expectedRequestToken = expectedStreamsRequestToken,
         settings = playerSettings,
@@ -813,6 +813,7 @@ internal fun StreamDestination(
         ) {
             StreamsScreen(
                 showLoadingScreen = showLoadingScreen,
+                isDownloadPicker = launch.isDownloadPicker,
                 type = launch.type,
                 videoId = effectiveVideoId,
                 parentMetaId = launch.parentMetaId ?: effectiveVideoId,

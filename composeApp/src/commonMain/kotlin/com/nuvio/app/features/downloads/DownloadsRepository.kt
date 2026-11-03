@@ -443,7 +443,59 @@ object DownloadsRepository {
         }
     }
 
-    private fun DownloadItem.hasPlayableLocalFile(): Boolean =
+    fun isContentDownloaded(
+        parentMetaId: String,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null,
+        videoId: String? = null,
+    ): Boolean {
+        ensureLoaded()
+        return findPlayableDownload(
+            parentMetaId = parentMetaId,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            videoId = videoId,
+        ) != null
+    }
+
+    fun isContentDownloading(
+        parentMetaId: String,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null,
+        videoId: String? = null,
+    ): Boolean {
+        ensureLoaded()
+        val normalizedParent = parentMetaId.trim()
+        val normalizedVideo = videoId?.trim().orEmpty()
+        return _uiState.value.items.any { item ->
+            item.status == DownloadStatus.Downloading &&
+                item.parentMetaId == normalizedParent &&
+                (if (seasonNumber != null && episodeNumber != null) {
+                    item.seasonNumber == seasonNumber && item.episodeNumber == episodeNumber
+                } else if (normalizedVideo.isNotEmpty()) {
+                    item.videoId == normalizedVideo || item.seasonNumber == null
+                } else {
+                    item.seasonNumber == null
+                })
+        }
+    }
+
+    fun getDownloadFor(
+        parentMetaId: String,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null,
+        videoId: String? = null,
+    ): DownloadItem? {
+        ensureLoaded()
+        return findPlayableDownload(
+            parentMetaId = parentMetaId,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            videoId = videoId,
+        )
+    }
+
+    internal fun DownloadItem.hasPlayableLocalFile(): Boolean =
         status == DownloadStatus.Completed &&
             DownloadsPlatformDownloader.resolveLocalFileUri(
                 localFileUri = localFileUri,

@@ -9,6 +9,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistAddCheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.rounded.Download
+import nuvio.composeapp.generated.resources.action_delete_download
+import nuvio.composeapp.generated.resources.action_download_episode
+import nuvio.composeapp.generated.resources.downloads_status_downloading
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,6 +51,11 @@ fun EpisodeWatchedActionSheet(
     onToggleSeasonWatched: () -> Unit,
     showPlayManually: Boolean = false,
     onPlayManually: (() -> Unit)? = null,
+    isEpisodeDownloaded: Boolean = false,
+    isEpisodeDownloading: Boolean = false,
+    onDownloadEpisode: (() -> Unit)? = null,
+    onDeleteEpisodeDownload: (() -> Unit)? = null,
+    onViewDownloads: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
@@ -118,6 +128,40 @@ fun EpisodeWatchedActionSheet(
                     title = stringResource(Res.string.play_manually),
                     onClick = {
                         onPlayManually()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
+            }
+            if (isEpisodeDownloaded && onDeleteEpisodeDownload != null) {
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Default.Delete,
+                    title = stringResource(Res.string.action_delete_download),
+                    onClick = {
+                        onDeleteEpisodeDownload()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
+            } else if (isEpisodeDownloading && onViewDownloads != null) {
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Rounded.Download,
+                    title = stringResource(Res.string.downloads_status_downloading),
+                    onClick = {
+                        onViewDownloads()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
+            } else if (onDownloadEpisode != null) {
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Rounded.Download,
+                    title = stringResource(Res.string.action_download_episode),
+                    onClick = {
+                        onDownloadEpisode()
                         coroutineScope.launch {
                             dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
                         }
