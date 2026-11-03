@@ -1678,6 +1678,10 @@
     <string name="streams_checking_more_addons">Checking more addons…</string>
     <string name="streams_copy_link">Copy stream link</string>
     <string name="streams_download_file">Download file</string>
+    <string name="action_delete_download">Delete download</string>
+    <string name="action_download_episode">Download episode</string>
+    <string name="downloads_select_quality_title">Select stream to download</string>
+    <string name="download_deleted_toast">Download removed</string>
     <string name="streams_open_external_player">Open in external player</string>
     <string name="streams_open_internal_player">Open in internal player</string>
     <string name="streams_empty_load_failed_message">The installed stream addons failed to return a valid stream response.</string>

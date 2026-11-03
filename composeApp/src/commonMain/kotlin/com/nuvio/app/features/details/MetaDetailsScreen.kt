@@ -113,6 +113,10 @@ import com.nuvio.app.features.details.components.DetailTrailersSection
 import com.nuvio.app.features.details.components.EpisodeWatchedActionSheet
 import com.nuvio.app.features.details.components.SeasonWatchedActionSheet
 import com.nuvio.app.features.details.components.TabletDetailBackdrop
+import com.nuvio.app.ContentDownloadAction
+import com.nuvio.app.features.downloads.DownloadsRepository
+import com.nuvio.app.features.downloads.DownloadsRepository.hasPlayableLocalFile
+import com.nuvio.app.features.downloads.DownloadStatus
 import com.nuvio.app.features.details.components.TabletDetailHero
 import com.nuvio.app.features.details.components.TrailerPlayerPopup
 import com.nuvio.app.features.home.MetaPreview
@@ -177,6 +181,8 @@ fun MetaDetailsScreen(
     onBack: () -> Unit,
     onPlay: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
     onPlayManually: ((type: String, videoId: String, parentMetaId: String, parentMetaType: String, title: String, logo: String?, poster: String?, background: String?, seasonNumber: Int?, episodeNumber: Int?, episodeTitle: String?, episodeThumbnail: String?, pauseDescription: String?, resumePositionMs: Long?) -> Unit)? = null,
+    onDownload: ContentDownloadAction? = null,
+    onOpenDownloads: (() -> Unit)? = null,
     onOpenMeta: ((MetaPreview) -> Unit)? = null,
     onCastClick: ((MetaPerson, String?) -> Unit)? = null,
     onCompanyClick: ((MetaCompany, String) -> Unit)? = null,
@@ -198,6 +204,11 @@ fun MetaDetailsScreen(
         shuffleWasInactive = !active
     }
     val uiState by MetaDetailsRepository.uiState.collectAsStateWithLifecycle()
+    val downloadsUiState by remember {
+        DownloadsRepository.ensureLoaded()
+        DownloadsRepository.uiState
+    }.collectAsStateWithLifecycle()
+    val downloadDeletedToastText = stringResource(Res.string.download_deleted_toast)
     val displayedMeta = uiState.meta?.takeIf { it.type == type && it.id == id }
         ?: MetaDetailsRepository.peek(type, id)
     val metaScreenSettingsUiState by remember {
@@ -855,6 +866,76 @@ fun MetaDetailsScreen(
                         }
                     }
                 }
+                val movieDownload = remember(downloadsUiState.items, id) {
+                    DownloadsRepository.getDownloadFor(parentMetaId = id, videoId = id)
+                }
+                val isMovieDownloaded = movieDownload != null
+                val isMovieDownloading = remember(downloadsUiState.items, id) {
+                    DownloadsRepository.isContentDownloading(parentMetaId = id, videoId = id)
+                }
+                val seriesEpisodeDownload = remember(downloadsUiState.items, id, seriesAction) {
+                    seriesAction?.let { action ->
+                        DownloadsRepository.getDownloadFor(
+                            parentMetaId = id,
+                            seasonNumber = action.seasonNumber,
+                            episodeNumber = action.episodeNumber,
+                            videoId = action.videoId,
+                        )
+                    }
+                }
+                val isSeriesEpisodeDownloaded = seriesEpisodeDownload != null
+                val isSeriesEpisodeDownloading = remember(downloadsUiState.items, id, seriesAction) {
+                    seriesAction?.let { action ->
+                        DownloadsRepository.isContentDownloading(
+                            parentMetaId = id,
+                            seasonNumber = action.seasonNumber,
+                            episodeNumber = action.episodeNumber,
+                            videoId = action.videoId,
+                        )
+                    } ?: false
+                }
+                val onPrimaryDownloadClick: (() -> Unit)? = onDownload?.let { downloadAction ->
+                    {
+                        if (hasEpisodes && seriesAction != null) {
+                            downloadAction(
+                                meta.type,
+                                seriesStreamVideoId ?: seriesAction.videoId,
+                                meta.id,
+                                meta.type,
+                                meta.name,
+                                meta.logo,
+                                meta.poster,
+                                meta.background,
+                                seriesAction.seasonNumber,
+                                seriesAction.episodeNumber,
+                                seriesAction.episodeTitle,
+                                seriesAction.episodeThumbnail,
+                            )
+                        } else {
+                            downloadAction(
+                                meta.type,
+                                meta.id,
+                                meta.id,
+                                meta.type,
+                                meta.name,
+                                meta.logo,
+                                meta.poster,
+                                meta.background,
+                                null,
+                                null,
+                                null,
+                                null,
+                            )
+                        }
+                    }
+                }
+                val onDeletePrimaryDownloadClick: () -> Unit = {
+                    val downloadToDelete = if (hasEpisodes) seriesEpisodeDownload else movieDownload
+                    if (downloadToDelete != null) {
+                        DownloadsRepository.cancelDownload(downloadToDelete.id)
+                        NuvioToastController.show(downloadDeletedToastText)
+                    }
+                }
                 val manualPlayHandler = onPlayManually
                 val showManualPlayOption = manualPlayHandler != null && StreamAutoPlayPolicy.isEffectivelyEnabled(playerSettingsUiState)
                 val onPrimaryPlayLongClick: (() -> Unit)? = manualPlayHandler
@@ -1180,12 +1261,17 @@ fun MetaDetailsScreen(
                                                         isWatched = isWatched,
                                                         isTablet = true,
                                                         shuffleEnabled = shuffleSettings.enabled,
+                                                        isDownloaded = if (hasEpisodes) isSeriesEpisodeDownloaded else isMovieDownloaded,
+                                                        isDownloading = if (hasEpisodes) isSeriesEpisodeDownloading else isMovieDownloading,
                                                         onPlayClick = onPrimaryPlayClick,
                                                         onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
                                                         onShuffleClick = onShuffleClick,
                                                         onWatchedClick = toggleWatched,
                                                         onSaveClick = toggleSaved,
                                                         onSaveLongClick = openLibraryListPicker,
+                                                        onDownloadClick = onPrimaryDownloadClick,
+                                                        onDeleteDownloadClick = onDeletePrimaryDownloadClick,
+                                                        onOpenDownloads = onOpenDownloads,
                                                     )
                                                 }
                                             } else {
@@ -1232,6 +1318,8 @@ fun MetaDetailsScreen(
                                     isPrimaryPlayEnabled = isPrimaryPlayEnabled,
                                     isSaved = isSaved,
                                     isWatched = isWatched,
+                                    isDownloaded = if (hasEpisodes) isSeriesEpisodeDownloaded else isMovieDownloaded,
+                                    isDownloading = if (hasEpisodes) isSeriesEpisodeDownloading else isMovieDownloading,
                                     onPrimaryPlayClick = onPrimaryPlayClick,
                                     onShuffleClick = onShuffleClick,
                                     shuffleEnabled = shuffleSettings.enabled,
@@ -1239,6 +1327,9 @@ fun MetaDetailsScreen(
                                     onSaveClick = toggleSaved,
                                     onSaveLongClick = openLibraryListPicker,
                                     onWatchedClick = toggleWatched,
+                                    onDownloadClick = onPrimaryDownloadClick,
+                                    onDeleteDownloadClick = onDeletePrimaryDownloadClick,
+                                    onOpenDownloads = onOpenDownloads,
                                     showManualPlayOption = showManualPlayOption,
                                     preferredEpisodeSeasonNumber = seriesAction?.seasonNumber,
                                     preferredEpisodeNumber = seriesAction?.episodeNumber,
@@ -1387,6 +1478,22 @@ fun MetaDetailsScreen(
                                     progressByVideoId = progressByVideoId,
                                 )
                             }
+                            val selectedEpisodeDownload = remember(downloadsUiState.items, id, selectedEpisode.season, selectedEpisode.episode) {
+                                DownloadsRepository.getDownloadFor(
+                                    parentMetaId = id,
+                                    seasonNumber = selectedEpisode.season,
+                                    episodeNumber = selectedEpisode.episode,
+                                    videoId = selectedEpisode.id,
+                                )
+                            }
+                            val isSelectedEpisodeDownloading = remember(downloadsUiState.items, id, selectedEpisode.season, selectedEpisode.episode) {
+                                DownloadsRepository.isContentDownloading(
+                                    parentMetaId = id,
+                                    seasonNumber = selectedEpisode.season,
+                                    episodeNumber = selectedEpisode.episode,
+                                    videoId = selectedEpisode.id,
+                                )
+                            }
                             EpisodeWatchedActionSheet(
                                 episode = selectedEpisode,
                                 seasonLabel = selectedEpisode.season?.let {
@@ -1396,6 +1503,39 @@ fun MetaDetailsScreen(
                                 canMarkPreviousEpisodes = previousEpisodes.isNotEmpty(),
                                 arePreviousEpisodesWatched = arePreviousEpisodesWatched,
                                 isSeasonWatched = isSeasonWatched,
+                                isEpisodeDownloaded = selectedEpisodeDownload != null,
+                                isEpisodeDownloading = isSelectedEpisodeDownloading,
+                                onDownloadEpisode = onDownload?.let { downloadAction ->
+                                    {
+                                        val episodeVideoId = buildPlaybackVideoId(
+                                            parentMetaId = meta.id,
+                                            seasonNumber = selectedEpisode.season,
+                                            episodeNumber = selectedEpisode.episode,
+                                            fallbackVideoId = selectedEpisode.id,
+                                        )
+                                        downloadAction(
+                                            meta.type,
+                                            episodeVideoId,
+                                            meta.id,
+                                            meta.type,
+                                            meta.name,
+                                            meta.logo,
+                                            meta.poster,
+                                            meta.background,
+                                            selectedEpisode.season,
+                                            selectedEpisode.episode,
+                                            selectedEpisode.title,
+                                            selectedEpisode.thumbnail,
+                                        )
+                                    }
+                                },
+                                onDeleteEpisodeDownload = selectedEpisodeDownload?.let { dl ->
+                                    {
+                                        DownloadsRepository.cancelDownload(dl.id)
+                                        NuvioToastController.show(downloadDeletedToastText)
+                                    }
+                                },
+                                onViewDownloads = onOpenDownloads,
                                 onDismiss = { selectedEpisodeForActions = null },
                                 onToggleWatched = {
                                     WatchingActions.toggleEpisodeWatched(
@@ -1922,6 +2062,8 @@ private fun LazyListScope.configuredMetaSectionItems(
     isPrimaryPlayEnabled: Boolean,
     isSaved: Boolean,
     isWatched: Boolean,
+    isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
     onPrimaryPlayClick: () -> Unit,
     onShuffleClick: (() -> Unit)?,
     shuffleEnabled: Boolean,
@@ -1929,6 +2071,9 @@ private fun LazyListScope.configuredMetaSectionItems(
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
+    onDownloadClick: (() -> Unit)? = null,
+    onDeleteDownloadClick: (() -> Unit)? = null,
+    onOpenDownloads: (() -> Unit)? = null,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -2007,6 +2152,8 @@ private fun LazyListScope.configuredMetaSectionItems(
                     isPrimaryPlayEnabled = isPrimaryPlayEnabled,
                     isSaved = isSaved,
                     isWatched = isWatched,
+                    isDownloaded = isDownloaded,
+                    isDownloading = isDownloading,
                     onPrimaryPlayClick = onPrimaryPlayClick,
                     onShuffleClick = onShuffleClick,
                     shuffleEnabled = shuffleEnabled,
@@ -2014,6 +2161,9 @@ private fun LazyListScope.configuredMetaSectionItems(
                     onSaveClick = onSaveClick,
                     onSaveLongClick = onSaveLongClick,
                     onWatchedClick = onWatchedClick,
+                    onDownloadClick = onDownloadClick,
+                    onDeleteDownloadClick = onDeleteDownloadClick,
+                    onOpenDownloads = onOpenDownloads,
                     showManualPlayOption = showManualPlayOption,
                     preferredEpisodeSeasonNumber = preferredEpisodeSeasonNumber,
                     preferredEpisodeNumber = preferredEpisodeNumber,
@@ -2236,6 +2386,8 @@ private fun ConfiguredMetaSections(
     isPrimaryPlayEnabled: Boolean,
     isSaved: Boolean,
     isWatched: Boolean,
+    isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
     onPrimaryPlayClick: () -> Unit,
     onShuffleClick: (() -> Unit)?,
     shuffleEnabled: Boolean,
@@ -2243,6 +2395,9 @@ private fun ConfiguredMetaSections(
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
+    onDownloadClick: (() -> Unit)? = null,
+    onDeleteDownloadClick: (() -> Unit)? = null,
+    onOpenDownloads: (() -> Unit)? = null,
     showManualPlayOption: Boolean,
     preferredEpisodeSeasonNumber: Int?,
     preferredEpisodeNumber: Int?,
@@ -2306,12 +2461,17 @@ private fun ConfiguredMetaSections(
                     isWatched = isWatched,
                     isTablet = isTablet,
                     shuffleEnabled = shuffleEnabled,
+                    isDownloaded = isDownloaded,
+                    isDownloading = isDownloading,
                     onPlayClick = onPrimaryPlayClick,
                     onPlayLongClick = if (showManualPlayOption) onPrimaryPlayLongClick else null,
                     onShuffleClick = onShuffleClick,
                     onWatchedClick = onWatchedClick,
                     onSaveClick = onSaveClick,
                     onSaveLongClick = onSaveLongClick,
+                    onDownloadClick = onDownloadClick,
+                    onDeleteDownloadClick = onDeleteDownloadClick,
+                    onOpenDownloads = onOpenDownloads,
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {

@@ -41,6 +41,21 @@ internal typealias ContentPlayAction = (
     resumePositionMs: Long?,
 ) -> Unit
 
+internal typealias ContentDownloadAction = (
+    type: String,
+    videoId: String,
+    parentMetaId: String,
+    parentMetaType: String,
+    title: String,
+    logo: String?,
+    poster: String?,
+    background: String?,
+    seasonNumber: Int?,
+    episodeNumber: Int?,
+    episodeTitle: String?,
+    episodeThumbnail: String?,
+) -> Unit
+
 @Composable
 internal fun rememberOpenMeta(navController: NuvioNavigator): (MetaPreview) -> Unit {
     val scope = rememberCoroutineScope()
@@ -70,6 +85,8 @@ internal fun DetailsDestination(
     navController: NuvioNavigator,
     onPlay: ContentPlayAction,
     onPlayManually: ContentPlayAction,
+    onDownload: ContentDownloadAction? = null,
+    onOpenDownloads: (() -> Unit)? = null,
     sharedTransitionScope: SharedTransitionScope,
     animatedVisibilityScope: AnimatedVisibilityScope,
 ) {
@@ -84,6 +101,8 @@ internal fun DetailsDestination(
         onBack = onBack,
         onPlay = onPlay,
         onPlayManually = onPlayManually,
+        onDownload = onDownload,
+        onOpenDownloads = onOpenDownloads,
         onOpenMeta = onOpenMeta,
         onCastClick = { person, avatarTransitionKey ->
             val tmdbId = person.tmdbId

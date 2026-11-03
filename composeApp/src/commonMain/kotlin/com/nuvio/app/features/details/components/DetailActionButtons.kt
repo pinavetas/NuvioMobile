@@ -24,6 +24,10 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.rounded.Download
+import nuvio.composeapp.generated.resources.compose_player_downloaded
+import nuvio.composeapp.generated.resources.downloads_status_downloading
+import nuvio.composeapp.generated.resources.streams_download_file
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -250,12 +254,17 @@ fun DetailActions(
     isWatched: Boolean,
     isTablet: Boolean,
     shuffleEnabled: Boolean,
+    isDownloaded: Boolean = false,
+    isDownloading: Boolean = false,
     onPlayClick: () -> Unit,
     onPlayLongClick: (() -> Unit)?,
     onShuffleClick: (() -> Unit)?,
     onWatchedClick: () -> Unit,
     onSaveClick: () -> Unit,
     onSaveLongClick: (() -> Unit)?,
+    onDownloadClick: (() -> Unit)? = null,
+    onDeleteDownloadClick: (() -> Unit)? = null,
+    onOpenDownloads: (() -> Unit)? = null,
 ) {
     val shuffleAction = onShuffleClick?.let { onClick ->
         DetailSecondaryAction(
@@ -288,6 +297,35 @@ fun DetailActions(
                     onLongClick = onSaveLongClick,
                 ),
             )
+            if (isDownloaded) {
+                add(
+                    DetailSecondaryAction(
+                        label = stringResource(Res.string.compose_player_downloaded),
+                        icon = Icons.Default.CheckCircle,
+                        isActive = true,
+                        onClick = onPlayClick,
+                        onLongClick = onDeleteDownloadClick,
+                    ),
+                )
+            } else if (isDownloading) {
+                add(
+                    DetailSecondaryAction(
+                        label = stringResource(Res.string.downloads_status_downloading),
+                        icon = Icons.Rounded.Download,
+                        isActive = true,
+                        onClick = { onOpenDownloads?.invoke() },
+                    ),
+                )
+            } else if (onDownloadClick != null) {
+                add(
+                    DetailSecondaryAction(
+                        label = stringResource(Res.string.streams_download_file),
+                        icon = Icons.Rounded.Download,
+                        isActive = false,
+                        onClick = onDownloadClick,
+                    ),
+                )
+            }
         },
         isTablet = isTablet,
         onPlayClick = onPlayClick,
